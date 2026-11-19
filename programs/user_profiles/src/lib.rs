@@ -11,22 +11,45 @@ pub use state::*;
 
 declare_id!("C7LUvHjb9ZNnrm6W6zWhagmLyTC8iySSUnkFvbT26y2j");
 
-#[program]
-pub mod user_profiles {
-    use super::*;
-
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        crate::instructions::initialize::handle_initialize(ctx)
-    }
-
-    pub fn increment(ctx: Context<Increment>) -> Result<()> {
-        crate::instructions::increment::handle_increment(ctx)
-    }
-}
-
 #[account]
 pub struct UserProfile{
     pub address: Pubkey,
     pub name: String,
     pub bio: String,
+}
+#[derive(Accounts)]
+pub struct InitializeProfile<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        init,
+        payer=authority,
+        space=8+32+(4+30)+(4+100),
+        seeds = [b"profile", authority.key().as_ref()],
+        bump,
+
+    )]
+    pub user_profile: Account<'info, UserProfile>,
+
+    pub system_program: Program<'info, System>, 
+}
+
+#[program]
+pub mod user_profiles {
+    use super::*;
+
+    pub fn initialize_profile(
+        ctx: Context<InitializeProfile>,
+        name: String,
+        bio: String
+    ) -> Result<()> {
+        let user_profile = &mut ctx.accounts.user_profile;
+        
+        user_profile.name=name;
+        user_profile.bio=bio;
+        user_profile.address= ctx.accounts.authority.key();
+
+        Ok(())
+    }
 }
