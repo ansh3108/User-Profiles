@@ -43,7 +43,14 @@ fn test_initialize_profile() {
 
     let blockhash = svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&authority.pubkey()), &blockhash);
-    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&authority]).unwrap;
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&authority]).unwrap();
 
     svm.send_transaction(tx).unwrap();
+
+    let account = svm.get_account(&profile_pda).expect("profile account not found");
+    let profile = user_profiles::UserProfile::try_deserialize(&mut account.data.as_slice()).unwrap();
+
+    assert_eq!(profile.name, "Hello");
+    assert_eq!(profile.bio, "World");
+    assert_eq!(profile.address, authority.pubkey());
 }
