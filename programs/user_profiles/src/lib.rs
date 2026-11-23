@@ -35,6 +35,20 @@ pub struct InitializeProfile<'info> {
     pub system_program: Program<'info, System>, 
 }
 
+
+#[derive(Accounts)]
+pub struct UpdateProfile<'info> {
+    pub authority: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"profile", authority.key().as_ref()],
+        bump,
+        constraint = user_profile.address == authority.key()
+    )]
+    pub user_profile: Account<'info, UserProfile>,
+}
+
+
 #[program]
 pub mod user_profiles {
     use super::*;
@@ -49,6 +63,15 @@ pub mod user_profiles {
         user_profile.name=name;
         user_profile.bio=bio;
         user_profile.address= ctx.accounts.authority.key();
+
+        Ok(())
+    }
+
+    pub fn update_profile(ctx: Context<UpdateProfile>, name: String, bio: String) -> Result<()>  {
+
+        let user_profile = &mut ctx.accounts.user_profile;
+        user_profile.name=name;
+        user_profile.bio=bio;
 
         Ok(())
     }
