@@ -48,7 +48,6 @@ pub struct UpdateProfile<'info> {
     pub user_profile: Account<'info, UserProfile>,
 }
 
-
 #[program]
 pub mod user_profiles {
     use super::*;
