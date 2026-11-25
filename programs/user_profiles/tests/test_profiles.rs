@@ -8,6 +8,7 @@ use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
+use user_profiles::UpdateProfile;
 
 #[test]
 fn test_initialize_profile() {
@@ -53,4 +54,32 @@ fn test_initialize_profile() {
     assert_eq!(profile.name, "Hello");
     assert_eq!(profile.bio, "World");
     assert_eq!(profile.address, authority.pubkey());
+}
+
+#[test] 
+fn test_update_profile() {
+    let mut svm = LiteSVM::new();
+
+    let program_id = user_profiles::ID;
+    let program_bytes = include_bytes!("../../../target/deploy/user_profiles.so");
+
+    svm.add_program(program_id, program_bytes).unwrap();
+
+    let authority = Keypair::new();
+    svm.airdrop(&authority.pubkey(), 1_000_000_000).unwrap();
+
+    let (profile_pda, _bump) = Pubkey::find_program_address(&[b"profile", authority.pubkey().as_ref()], &program_id);
+
+    
+    let update_ix_data = user_profiles::instruction::UpdateProfile {
+        name: "Updated Name".to_string(),
+        bio: "Updated Bio".to_string(),
+    }.data();
+
+    let update_accounts = user_profiles::accounts::UpdateProfile {
+        authority: authority.pubkey(),
+        user_profile: profile_pda,
+    }.to_account_metas(None);
+
+    Instruction::new_with_bytes(program_id, &update_ix_data, update_accounts);
 }
