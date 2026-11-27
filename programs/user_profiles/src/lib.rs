@@ -1,12 +1,7 @@
-pub mod constants;
-pub mod error;
-pub mod instructions;
 pub mod state;
 
 use anchor_lang::prelude::*;
 
-pub use constants::*;
-pub use instructions::*;
 pub use state::*;
 
 declare_id!("C7LUvHjb9ZNnrm6W6zWhagmLyTC8iySSUnkFvbT26y2j");
@@ -57,6 +52,10 @@ pub mod user_profiles {
         name: String,
         bio: String
     ) -> Result<()> {
+
+        require!(name.len() <= 30, ProfileError::NameTooLong);
+        require!(bio.len() <= 100, ProfileError::BioTooLong);
+
         let user_profile = &mut ctx.accounts.user_profile;
         
         user_profile.name=name;
@@ -68,10 +67,21 @@ pub mod user_profiles {
 
     pub fn update_profile(ctx: Context<UpdateProfile>, name: String, bio: String) -> Result<()>  {
 
+        require!(name.len() <= 30, ProfileError::NameTooLong);
+        require!(bio.len() <= 100, ProfileError::BioTooLong);
+
         let user_profile = &mut ctx.accounts.user_profile;
         user_profile.name=name;
         user_profile.bio=bio;
 
         Ok(())
     }
+}
+
+#[error_code]
+pub enum ProfileError {
+    #[msg("Name cannot exceed 30 bytes")]
+    NameTooLong,
+    #[msg("Bio cannot exceed 100 bytes")]
+    BioTooLong,
 }
