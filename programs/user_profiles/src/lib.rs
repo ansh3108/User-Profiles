@@ -25,9 +25,23 @@ pub struct InitializeProfile<'info> {
         bump,
 
     )]
-    pub user_profile: Account<'info, UserProfile>,
 
+    pub user_profile: Account<'info, UserProfile>,
     pub system_program: Program<'info, System>, 
+}
+
+#[derive(Accounts)]
+pub struct CloseProfile<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        mut,
+        close = authority,
+        seeds = [b"profile", authority.key().as_ref()],
+        bump,
+        constraint = user_profile.address == authority.key()
+    )]
+    pub user_profile: Account<'info, UserProfile>,
 }
 
 
@@ -74,6 +88,10 @@ pub mod user_profiles {
         user_profile.name=name;
         user_profile.bio=bio;
 
+        Ok(())
+    }
+
+    pub fn close_profile(_ctx: Context<CloseProfile>) -> Result<()> {
         Ok(())
     }
 }

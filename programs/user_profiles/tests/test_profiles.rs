@@ -175,7 +175,7 @@ fn test_profile_length_validation() {
     let authority = Keypair::new();
     svm.airdrop(&authority.pubkey(), 1_000_000_000).unwrap();
 
-    let (profile_pda, bump) =
+    let (profile_pda, _bump) =
         Pubkey::find_program_address(&[b"profile", authority.pubkey().as_ref()], &program_id);
 
     let init_bad_ix = Instruction::new_with_bytes(
@@ -326,4 +326,89 @@ fn test_profile_length_validation() {
         user_profiles::UserProfile::try_deserialize(&mut account.data.as_slice()).unwrap();
     assert_eq!(profile.name, max_name);
     assert_eq!(profile.bio, max_bio);
+    
+}
+
+
+#[test]
+fn test_close_profile() {
+    let mut svm = LiteSVM::new();
+
+    let program_id = user_profiles::ID;
+    let program_bytes = include_bytes!("../../../target/deploy/user_profiles.so");
+    svm.add_program(program_id, program_bytes).unwrap();
+
+    let authority = Keypair::new();
+    svm.airdrop(&authority.pubkey(), 1_000_000_000).unwrap();
+
+    let (profile_pda, _bump) =
+        Pubkey::find_program_address(&[b"profile", authority.pubkey().as_ref()], &program_id);
+
+    let init_ix = Instruction::new_with_bytes(
+        program_id,
+        &user_profiles::instruction::InitializeProfile {
+            name: "Ansh".to_string(),
+            bio: "Solana dev".to_string(),
+        }
+        .data(),
+        user_profiles::accounts::InitializeProfile {
+            user_profile: profile_pda,
+            authority: authority.pubkey(),
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+    );
+    let init_tx = Transaction::new_signed_with_payer(
+        &[init_ix],
+        Some(&authority.pubkey()),
+        &[&authority],
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(init_tx).unwrap();
+
+    let rent_lamports = svm.get_account(&profile_pda).unwrap().lamports;
+    let balance_before = svm.get_account(&authority.pubkey()).unwrap().lamports;
+
+    let attacker = Keypair::new();
+    svm.airdrop(&attacker.pubkey(), 1_000_000_000).unwrap();
+
+    let attack_close_ix = Instruction::new_with_bytes(
+        program_id,
+        &user_profiles::instruction::CloseProfile {}.data(),
+        user_profiles::accounts::CloseProfile {
+            authority: attacker.pubkey(),
+            user_profile: profile_pda,
+        }
+        .to_account_metas(None),
+    );
+    let attack_close_tx = Transaction::new_signed_with_payer(
+        &[attack_close_ix],
+        Some(&attacker.pubkey()),
+        &[&attacker],
+        svm.latest_blockhash(),
+    );
+    assert!(svm.send_transaction(attack_close_tx).is_err());
+    assert!(svm.get_account(&profile_pda).is_some());
+
+    let close_ix = Instruction::new_with_bytes(
+        program_id,
+        &user_profiles::instruction::CloseProfile {}.data(),
+        user_profiles::accounts::CloseProfile {
+            authority: authority.pubkey(),
+            user_profile: profile_pda,
+        }
+        .to_account_metas(None),
+    );
+    let close_tx = Transaction::new_signed_with_payer(
+        &[close_ix],
+        Some(&authority.pubkey()),
+        &[&authority],
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(close_tx).unwrap();
+
+    assert!(svm.get_account(&profile_pda).is_none());
+
+    let balance_after = svm.get_account(&authority.pubkey()).unwrap().lamports;
+    assert_eq!(balance_after, balance_before + rent_lamports - 5_000);
 }
