@@ -7,27 +7,28 @@ pub use state::*;
 declare_id!("C7LUvHjb9ZNnrm6W6zWhagmLyTC8iySSUnkFvbT26y2j");
 
 #[account]
-pub struct UserProfile{
+#[derive(InitSpace)]
+pub struct UserProfile {
     pub address: Pubkey,
+    #[max_len(30)]
     pub name: String,
+    #[max_len(100)]
     pub bio: String,
+    pub bump: u8,
 }
 #[derive(Accounts)]
 pub struct InitializeProfile<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
     #[account(
         init,
-        payer=authority,
-        space=8+32+(4+30)+(4+100),
+        payer = authority,
+        space = UserProfile::DISCRIMINATOR.len() + UserProfile::INIT_SPACE,
         seeds = [b"profile", authority.key().as_ref()],
-        bump,
-
+        bump
     )]
-
     pub user_profile: Account<'info, UserProfile>,
-    pub system_program: Program<'info, System>, 
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -38,12 +39,11 @@ pub struct CloseProfile<'info> {
         mut,
         close = authority,
         seeds = [b"profile", authority.key().as_ref()],
-        bump,
+        bump = user_profile.bump,
         constraint = user_profile.address == authority.key()
     )]
     pub user_profile: Account<'info, UserProfile>,
 }
-
 
 #[derive(Accounts)]
 pub struct UpdateProfile<'info> {
@@ -64,29 +64,28 @@ pub mod user_profiles {
     pub fn initialize_profile(
         ctx: Context<InitializeProfile>,
         name: String,
-        bio: String
+        bio: String,
     ) -> Result<()> {
-
         require!(name.len() <= 30, ProfileError::NameTooLong);
         require!(bio.len() <= 100, ProfileError::BioTooLong);
 
         let user_profile = &mut ctx.accounts.user_profile;
-        
-        user_profile.name=name;
-        user_profile.bio=bio;
-        user_profile.address= ctx.accounts.authority.key();
+
+        user_profile.name = name;
+        user_profile.bio = bio;
+        user_profile.address = ctx.accounts.authority.key();
+        user_profile.bump = ctx.bumps.user_profile;
 
         Ok(())
     }
 
-    pub fn update_profile(ctx: Context<UpdateProfile>, name: String, bio: String) -> Result<()>  {
-
+    pub fn update_profile(ctx: Context<UpdateProfile>, name: String, bio: String) -> Result<()> {
         require!(name.len() <= 30, ProfileError::NameTooLong);
         require!(bio.len() <= 100, ProfileError::BioTooLong);
 
         let user_profile = &mut ctx.accounts.user_profile;
-        user_profile.name=name;
-        user_profile.bio=bio;
+        user_profile.name = name;
+        user_profile.bio = bio;
 
         Ok(())
     }
